@@ -1,0 +1,1 @@
+{"name": "음성 텍스트", "short_name": "음성텍스트", "start_url": "./", "display": "standalone", "background_color": "#f3f5f8", "theme_color": "#2f6fdf", "icons": [{"src": "icon.png", "sizes": "512x512", "type": "image/png"}]}
