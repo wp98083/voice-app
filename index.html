@@ -1,0 +1,300 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>음성 텍스트</title>
+<meta name="theme-color" content="#2f6fdf">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="음성텍스트">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon.png">
+<link rel="apple-touch-icon" href="icon.png">
+<style>
+:root{--bg:#f3f5f8;--card:#fff;--ink:#1b2430;--sub:#5b6675;--line:#dfe3ea;--main:#2f6fdf;--rec:#d64545;--ok:#1d7a46;--bad:#b3261e}
+@media (prefers-color-scheme:dark){:root{--bg:#12161c;--card:#1c222b;--ink:#e8ecf2;--sub:#9aa5b4;--line:#2c3440;--main:#4d8ad6;--rec:#e05a5a;--ok:#4cc47f;--bad:#ff7a70}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.55 -apple-system,"Apple SD Gothic Neo","Malgun Gothic",sans-serif}
+header{background:var(--main);color:#fff;padding:calc(14px + env(safe-area-inset-top)) 16px 14px;font-weight:700;font-size:19px;display:flex;align-items:center;gap:10px}
+header button{margin-left:auto;background:none;border:0;color:#fff;font-size:15px}
+main{padding:16px;max-width:620px;margin:0 auto}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;margin-bottom:14px}
+.big{display:block;width:100%;padding:20px;border:0;border-radius:14px;font-size:20px;font-weight:700;background:var(--main);color:#fff;margin-bottom:10px}
+.big.rec{background:var(--rec)}
+.big:disabled{opacity:.5}
+.ghost{display:block;width:100%;padding:13px;border:1px solid var(--line);border-radius:12px;font-size:16px;background:var(--card);color:var(--ink);margin-top:8px}
+input[type=file]{display:none}
+.opt{display:flex;align-items:center;gap:10px;margin:8px 0}
+.opt span{flex:1}
+select,input[type=text]{padding:9px;border:1px solid var(--line);border-radius:10px;font-size:16px;background:var(--bg);color:var(--ink)}
+.msg{font-size:17px;text-align:center;padding:6px 0;margin:0}
+.sub{color:var(--sub);font-size:14px}
+.ok{color:var(--ok)}.bad{color:var(--bad)}
+.bar{height:8px;background:var(--line);border-radius:4px;overflow:hidden;margin:10px 0}
+.bar i{display:block;height:100%;width:0;background:var(--main);transition:width .4s}
+.spin{width:34px;height:34px;border:4px solid var(--line);border-top-color:var(--main);border-radius:50%;margin:8px auto;animation:s 1s linear infinite}
+@keyframes s{to{transform:rotate(360deg)}}
+.timer{font-size:44px;font-weight:700;text-align:center;font-variant-numeric:tabular-nums}
+.dot{display:inline-block;width:12px;height:12px;border-radius:50%;background:var(--rec);margin-right:8px;animation:b 1s infinite}
+@keyframes b{50%{opacity:.2}}
+.tabs{display:flex;gap:6px;margin:12px 0 8px}
+.tabs button{flex:1;padding:10px 4px;border:1px solid var(--line);border-radius:10px;background:var(--card);color:var(--ink);font-size:15px}
+.tabs button.on{background:var(--main);color:#fff;border-color:var(--main);font-weight:700}
+pre{white-space:pre-wrap;word-break:keep-all;overflow-wrap:anywhere;font:15px/1.7 inherit;margin:0;font-family:inherit}
+.row2{display:flex;gap:8px}.row2 .ghost{flex:1}
+.hist{display:block;width:100%;text-align:left;padding:12px 14px;border:1px solid var(--line);border-radius:12px;background:var(--card);color:var(--ink);margin-bottom:8px;font-size:15px}
+.hist small{display:block;color:var(--sub)}
+.name{display:flex;align-items:center;gap:8px;margin:6px 0}
+.name b{width:72px;flex:none}
+.name input{flex:1;min-width:0}
+.hide{display:none}
+</style>
+</head>
+<body>
+<header>🎙 음성 텍스트 <button id="homeBtn" class="hide" onclick="reset()">처음으로</button></header>
+<main>
+  <section id="vNoToken" class="card hide">
+    <p class="msg">처음 한 번만 연결이 필요해요.</p>
+    <p class="sub">사무실 PC의 <b>폰연결 설정</b> 화면에 나온 QR코드를 휴대폰 카메라로 찍어서 들어오세요.</p>
+  </section>
+
+  <section id="vStart" class="hide">
+    <button class="big" onclick="$('#pick').click()">📁 녹음 파일 올리기</button>
+    <input id="pick" type="file" accept="audio/*,.m4a,.mp3,.wav,.amr,.3gp,.aac,.ogg">
+    <button class="big rec" onclick="startRec()">● 여기서 바로 녹음</button>
+    <div class="card">
+      <div class="opt"><span>말한 사람 수</span>
+        <select id="spk"><option value="0">자동으로 판단</option><option value="1">구분 안 함</option>
+          <option value="2">2명</option><option value="3">3명</option><option value="4">4명</option>
+          <option value="5">5명</option><option value="6">6명</option></select></div>
+      <label class="opt"><span>AI로 회의록도 만들기</span><input id="ai" type="checkbox" checked style="width:22px;height:22px"></label>
+      <p class="sub" style="margin:6px 0 0">갤럭시 녹음 앱 파일은 <b>내 파일 → 음성 녹음</b> 폴더에 있어요. 올리면 사무실 PC가 글로 바꿔서 여기로 보내줘요.</p>
+    </div>
+    <div id="hist"></div>
+  </section>
+
+  <section id="vRec" class="card hide">
+    <p class="msg"><span class="dot"></span>녹음 중</p>
+    <div class="timer" id="recTime">00:00</div>
+    <p class="sub" style="text-align:center">녹음하는 동안 화면을 끄거나 다른 앱으로 가지 마세요.<br>긴 회의는 갤럭시 녹음 앱으로 녹음한 뒤 파일을 올리는 게 안전해요.</p>
+    <button class="big" onclick="stopRec()">■ 녹음 끝내고 올리기</button>
+    <button class="ghost" onclick="cancelRec()">취소</button>
+  </section>
+
+  <section id="vWait" class="card hide">
+    <div class="spin"></div>
+    <p class="msg" id="waitMsg">올리는 중…</p>
+    <div class="bar"><i id="barFill"></i></div>
+    <p class="sub" id="waitSub" style="text-align:center"></p>
+    <p class="sub" style="text-align:center">이 화면을 닫아도 PC는 계속 작업해요. 나중에 다시 열면 '지난 기록'에 있어요.</p>
+  </section>
+
+  <section id="vResult" class="hide">
+    <div class="card">
+      <b id="rTitle"></b>
+      <p class="sub" id="rSub" style="margin:4px 0 0"></p>
+      <p class="bad" id="rErr"></p>
+      <div id="names"></div>
+    </div>
+    <div class="tabs">
+      <button data-k="minutes" onclick="tab('minutes')">회의록</button>
+      <button data-k="polished" onclick="tab('polished')">다듬은 대본</button>
+      <button data-k="transcript" onclick="tab('transcript')">대본</button>
+    </div>
+    <div class="card"><pre id="rText"></pre></div>
+    <div class="row2"><button class="ghost" onclick="copyText()">복사</button><button class="ghost" onclick="shareText()">공유</button></div>
+    <button class="ghost" onclick="reset()">처음으로</button>
+  </section>
+
+  <section id="vFail" class="card hide">
+    <p class="msg bad">❌ 실패</p>
+    <p class="sub" id="failSub" style="text-align:center"></p>
+    <button class="big" onclick="reset()">처음으로</button>
+  </section>
+</main>
+<script>
+const OWNER = "wp98083", REPO = "voice-data";
+const CHUNK = 15 * 1024 * 1024;              // 15MB씩 나눠 올림
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+let TOKEN = null, jobId = null, pollTimer = null, cur = null, curTab = "minutes";
+
+(function(){
+  const m = location.hash.match(/t=([^&]+)/);
+  if (m) { TOKEN = decodeURIComponent(m[1]); try { localStorage.setItem("vt_token", TOKEN); } catch(e){}
+           history.replaceState(null, "", location.pathname); }
+  if (!TOKEN) { try { TOKEN = localStorage.getItem("vt_token"); } catch(e){} }
+})();
+
+function show(id){
+  ["#vNoToken","#vStart","#vRec","#vWait","#vResult","#vFail"].forEach(v => $(v).classList.toggle("hide", v !== id));
+  $("#homeBtn").classList.toggle("hide", id === "#vStart" || id === "#vNoToken" || id === "#vRec");
+  window.scrollTo(0, 0);
+}
+
+async function api(method, path, body){
+  const r = await fetch(`https://api.github.com/repos/${OWNER}/${REPO}/contents/${path}` + (method === "GET" ? `?t=${Date.now()}` : ""), {
+    method, cache: "no-store",
+    headers: { "Authorization": "Bearer " + TOKEN, "Accept": method === "GET" ? "application/vnd.github.raw" : "application/vnd.github+json" },
+    body: body ? JSON.stringify(body) : undefined });
+  if (r.status === 404) return null;
+  if (r.status === 401) throw new Error("연결 비밀번호가 맞지 않아요. PC의 QR을 다시 찍어 주세요.");
+  if (!r.ok) throw new Error("GitHub 오류 " + r.status);
+  return method === "GET" ? r.text() : r.json();
+}
+async function listDir(d){
+  const r = await fetch(`https://api.github.com/repos/${OWNER}/${REPO}/contents/${d}?t=${Date.now()}`,
+    { cache: "no-store", headers: { "Authorization": "Bearer " + TOKEN, "Accept": "application/vnd.github+json" } });
+  if (!r.ok) return [];
+  const j = await r.json(); return Array.isArray(j) ? j : [];
+}
+const b64 = s => btoa(unescape(encodeURIComponent(s)));
+function bytesToB64(u8){ let s = ""; for (let i = 0; i < u8.length; i += 0x8000) s += String.fromCharCode.apply(null, u8.subarray(i, i + 0x8000)); return btoa(s); }
+function newId(){ const d = new Date(), p = n => String(n).padStart(2, "0");
+  return `${d.getFullYear()}${p(d.getMonth()+1)}${p(d.getDate())}_${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}_${Math.random().toString(36).slice(2,6)}`; }
+const idTime = id => { const m = id.match(/^(\d{4})(\d{2})(\d{2})_(\d{2})(\d{2})/); return m ? `${+m[2]}/${+m[3]} ${m[4]}:${m[5]}` : id; };
+function setBar(p){ $("#barFill").style.width = Math.round(Math.max(0, Math.min(1, p)) * 100) + "%"; }
+
+// ---------- 올리기 ----------
+async function upload(blob, name){
+  show("#vWait"); setBar(0);
+  const parts = Math.max(1, Math.ceil(blob.size / CHUNK));
+  const mb = (blob.size / 1048576).toFixed(1);
+  try {
+    jobId = newId();
+    for (let i = 0; i < parts; i++){
+      $("#waitMsg").textContent = `올리는 중… (${mb}MB)`;
+      $("#waitSub").textContent = parts > 1 ? `${i + 1} / ${parts} 조각` : "";
+      const u8 = new Uint8Array(await blob.slice(i * CHUNK, (i + 1) * CHUNK).arrayBuffer());
+      await api("PUT", `inbox/${jobId}/part${String(i).padStart(3, "0")}.bin`, { message: "phone", content: bytesToB64(u8) });
+      setBar((i + 1) / parts * 0.15);
+    }
+    const meta = { name, parts, speakers: +$("#spk").value, ai: $("#ai").checked };
+    await api("PUT", `inbox/${jobId}/meta.json`, { message: "phone", content: b64(JSON.stringify(meta)) });
+    $("#waitMsg").textContent = "PC에 보냈어요. PC가 받기를 기다리는 중…"; $("#waitSub").textContent = "";
+    poll(Date.now());
+  } catch(err){ fail("올리지 못했어요. " + err.message); }
+}
+$("#pick").addEventListener("change", e => { const f = e.target.files[0]; e.target.value = ""; if (f) upload(f, f.name); });
+
+// ---------- 여기서 녹음 ----------
+let rec = null, chunks = [], recStart = 0, recTimer = null, wake = null, recCancel = false;
+async function startRec(){
+  let stream;
+  try { stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false } }); }
+  catch(e){ alert("마이크를 쓸 수 없어요. 브라우저의 마이크 권한을 허용해 주세요."); return; }
+  const type = ["audio/webm;codecs=opus", "audio/mp4", "audio/webm"].find(t => window.MediaRecorder && MediaRecorder.isTypeSupported(t)) || "";
+  rec = new MediaRecorder(stream, type ? { mimeType: type, audioBitsPerSecond: 48000 } : undefined);
+  chunks = []; recCancel = false;
+  rec.ondataavailable = e => { if (e.data.size) chunks.push(e.data); };
+  rec.onstop = () => {
+    stream.getTracks().forEach(t => t.stop());
+    clearInterval(recTimer); try { wake && wake.release(); } catch(e){}
+    if (recCancel) { reset(); return; }
+    const mime = rec.mimeType || type || "audio/webm";
+    const ext = mime.includes("mp4") ? "m4a" : "webm";
+    const d = new Date(), p = n => String(n).padStart(2, "0");
+    upload(new Blob(chunks, { type: mime }), `폰녹음_${String(d.getFullYear()).slice(2)}${p(d.getMonth()+1)}${p(d.getDate())}_${p(d.getHours())}${p(d.getMinutes())}.${ext}`);
+  };
+  rec.start(10000);
+  try { wake = await navigator.wakeLock.request("screen"); } catch(e){}
+  recStart = Date.now(); $("#recTime").textContent = "00:00";
+  recTimer = setInterval(() => { const s = Math.floor((Date.now() - recStart) / 1000), p = n => String(n).padStart(2, "0");
+    $("#recTime").textContent = (s >= 3600 ? Math.floor(s / 3600) + ":" : "") + p(Math.floor(s / 60) % 60) + ":" + p(s % 60); }, 500);
+  show("#vRec");
+}
+function stopRec(){ if (rec && rec.state !== "inactive") rec.stop(); }
+function cancelRec(){ if (confirm("녹음을 버릴까요?")) { recCancel = true; stopRec(); } }
+
+// ---------- 결과 기다리기 ----------
+function poll(start, prevFinished){
+  clearTimeout(pollTimer);
+  pollTimer = setTimeout(async () => {
+    try {
+      const t = await api("GET", `status/${jobId}.json`);
+      const s = t ? JSON.parse(t) : null;
+      const min = Math.floor((Date.now() - start) / 60000);
+      if (!s) { $("#waitSub").textContent = min >= 1 ? "⚠ PC가 아직 안 받았어요. 사무실 PC가 켜져 있으면 곧 시작해요." : "";
+                return poll(start, prevFinished); }
+      if (s.state === "done" && (!prevFinished || s.finished !== prevFinished || JSON.stringify(s.speakers) !== JSON.stringify(cur && cur.speakers))) return showResult(s);
+      if (s.state === "error") return fail(s.error || "PC에서 오류가 났어요.");
+      if (s.state !== "done") { $("#waitMsg").textContent = s.msg || "PC가 작업 중…"; setBar(0.15 + (s.p || 0) * 0.85);
+        $("#waitSub").textContent = `${min}분 지남 · 40분 녹음이면 보통 10~15분 걸려요`; }
+      poll(start, prevFinished);
+    } catch(err){ $("#waitSub").textContent = "인터넷 확인 중… " + err.message; poll(start, prevFinished); }
+  }, 5000);
+}
+
+// ---------- 결과 보기 ----------
+function showResult(s){
+  clearTimeout(pollTimer); cur = s;
+  $("#rTitle").textContent = s.title || "";
+  $("#rSub").textContent = s.finished ? `${s.finished} 완료 · PC의 음성파일 폴더에도 저장됨` : "";
+  $("#rErr").textContent = s.ai_error || "";
+  const box = $("#names");
+  if ((s.speakers || []).length > 1) {
+    box.innerHTML = `<p style="margin:12px 0 4px;font-weight:700">말한 사람 이름 (모르면 비워 두기)</p>` +
+      s.speakers.map(n => `<div class="name"><b>발화자 ${n}</b><input type="text" data-n="${n}" placeholder="예: 팀장님"></div>`).join("") +
+      `<button class="ghost" onclick="rename()">이름 적용</button>`;
+  } else box.innerHTML = "";
+  tab(s.minutes ? "minutes" : s.polished ? "polished" : "transcript");
+  show("#vResult");
+}
+function tab(k){
+  curTab = k;
+  document.querySelectorAll(".tabs button").forEach(b => { b.classList.toggle("on", b.dataset.k === k);
+    b.disabled = !(cur && cur[b.dataset.k]); });
+  $("#rText").textContent = (cur && cur[k]) || "";
+}
+async function rename(){
+  const names = {};
+  document.querySelectorAll("#names input").forEach(i => { if (i.value.trim()) names[i.dataset.n] = i.value.trim(); });
+  if (!Object.keys(names).length) return;
+  show("#vWait"); setBar(1); $("#waitMsg").textContent = "이름 바꾸는 중…"; $("#waitSub").textContent = "";
+  try {
+    await api("PUT", `cmd/${jobId}.json`, { message: "phone", content: b64(JSON.stringify({ action: "rename", names })) });
+    poll(Date.now(), cur.finished);
+  } catch(err){ fail(err.message); }
+}
+async function copyText(){
+  try { await navigator.clipboard.writeText($("#rText").textContent); alert("복사했어요."); }
+  catch(e){ alert("복사하지 못했어요. 글을 길게 눌러 복사해 주세요."); }
+}
+async function shareText(){
+  const label = { minutes: "회의록", polished: "다듬은 대본", transcript: "대본" }[curTab];
+  if (navigator.share) { try { await navigator.share({ title: `${cur.title} ${label}`, text: $("#rText").textContent }); } catch(e){} }
+  else copyText();
+}
+
+function fail(msg){ clearTimeout(pollTimer); $("#failSub").innerText = msg; show("#vFail"); }
+function reset(){ clearTimeout(pollTimer); jobId = null; cur = null; show("#vStart"); loadHistory(); }
+
+// ---------- 지난 기록 ----------
+async function loadHistory(){
+  const box = $("#hist"); box.innerHTML = "";
+  try {
+    const waiting = (await listDir("inbox")).filter(x => x.type === "dir").map(x => x.name);
+    const ids = (await listDir("status")).map(x => x.name.replace(/\.json$/, "")).sort().reverse().slice(0, 12);
+    const items = [];
+    for (const id of waiting) if (!ids.includes(id))
+      items.push(`<button class="hist" onclick="openJob('${esc(id)}')">⏳ ${idTime(id)} 올린 녹음<small>PC가 꺼져 있으면 켜질 때 시작해요</small></button>`);
+    const stats = await Promise.all(ids.map(id => api("GET", `status/${id}.json`).then(t => [id, t ? JSON.parse(t) : null]).catch(() => [id, null])));
+    for (const [id, s] of stats){
+      if (!s) continue;
+      const label = s.state === "done" ? `📄 ${esc(s.title)}` : s.state === "error" ? `❌ ${idTime(id)} 실패` : `⏳ ${idTime(id)} 작업 중`;
+      const sub = s.state === "done" ? (s.finished || "") : s.state === "error" ? esc(s.error || "") : esc(s.msg || "");
+      items.push(`<button class="hist" onclick="openJob('${esc(id)}')">${label}<small>${sub}</small></button>`);
+    }
+    if (items.length) box.innerHTML = `<p style="font-weight:700;margin:18px 0 8px">지난 기록</p>` + items.join("");
+  } catch(e) {}
+}
+async function openJob(id){
+  jobId = id; show("#vWait"); setBar(0); $("#waitMsg").textContent = "불러오는 중…"; $("#waitSub").textContent = "";
+  poll(Date.now() - 1);
+}
+
+show(TOKEN ? "#vStart" : "#vNoToken");
+if (TOKEN) loadHistory();
+</script>
+</body>
+</html>
